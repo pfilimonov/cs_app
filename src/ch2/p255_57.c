@@ -58,6 +58,16 @@ void simple_show_b() {
   /* $end simple-show-b */
 }
 
+/* My code */
+
+void show_short(short s) { show_bytes((byte_pointer)&s, sizeof(short)); }
+
+void show_long(long l) { show_bytes((byte_pointer)&l, sizeof(long)); }
+
+void show_double(double d) { show_bytes((byte_pointer)&d, sizeof(double)); }
+
+/* My code ends */
+
 void float_eg() {
   int x = 3490593;
   float f = (float)x;
@@ -105,6 +115,12 @@ int main(int argc, char *argv[]) {
     }
     printf("calling test_show_bytes\n");
     test_show_bytes(val);
+
+    // My code tests
+    printf("\nCalling My Code (short, long, double):\n");
+    show_short(val);
+    show_long(val);
+    show_double(strtod(argv[1], NULL));
   } else {
     printf("calling show_twocomp\n");
     show_twocomp();
