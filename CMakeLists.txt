@@ -45,7 +45,7 @@ endif()
 # ════════════════════════════════════════════════════════════════
 
 add_executable(csapp
-    src/ch2/p263.c
+    src/ch2/p270.c
 )
 
 target_include_directories(csapp PRIVATE
