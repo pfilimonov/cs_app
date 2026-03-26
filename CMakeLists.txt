@@ -44,8 +44,12 @@ endif()
 # Main Executable
 # ════════════════════════════════════════════════════════════════
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+
 add_executable(csapp
-    src/ch3/fact.c
+    src/ch3/p358.c
 )
 
 target_include_directories(csapp PRIVATE
