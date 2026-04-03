@@ -314,7 +314,19 @@ int howManyBits(int x) {
  *   Max ops: 30
  *   Rating: 4
  */
-unsigned floatScale2(unsigned uf) { return 2; }
+unsigned floatScale2(unsigned uf) {
+  // special
+  if ((uf & 0x7f800000) == 0x7f800000)
+    return uf;
+
+  // denormalized
+  if ((uf & 0x7f800000) == 0x0) {
+    return (uf << 1) | (uf & 0x80000000u);
+  }
+
+  // normalized
+  return (((uf >> 23) + 1) << 23) | (uf & (~0x7f800000));
+}
 /*
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
  *   for floating point argument f.
@@ -327,7 +339,43 @@ unsigned floatScale2(unsigned uf) { return 2; }
  *   Max ops: 30
  *   Rating: 4
  */
-int floatFloat2Int(unsigned uf) { return 2; }
+int floatFloat2Int(unsigned uf) {
+  unsigned sign = uf >> 31;
+  unsigned exp = (uf >> 23) & 0xFF;
+  unsigned frac = uf & 0x007FFFFF;
+  int first;
+
+  if (exp == 0xFF) {
+    return 0x80000000;
+  }
+
+  if (exp) {
+    //  Norm
+    int E = exp - 127;
+    if (E >= 31) {
+      // printf("Too big exp E=%d\n", E);
+      return 0x80000000;
+    }
+    if (E < 0) {
+      return 0;
+    }
+    frac = frac | (1 << 23);
+    if (E <= 23) {
+      first = frac >> (23 - E);
+    } else {
+      first = frac << (E - 23);
+    }
+
+    if (sign) {
+      return (~first + 1); // -first
+    } else {
+      return first;
+    }
+  } else {
+    // Denorm rounds toward zero
+    return 0;
+  }
+}
 /*
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
  *   (2.0 raised to the power x) for any 32-bit integer x.
@@ -341,4 +389,14 @@ int floatFloat2Int(unsigned uf) { return 2; }
  *   Max ops: 30
  *   Rating: 4
  */
-unsigned floatPower2(int x) { return 2; }
+unsigned floatPower2(int x) {
+  if (x > 127) {
+    return 0x7f800000;
+  } else if (x >= -126) {
+    return ((x + 127) << 23);
+  } else if (x >= -149) {
+    return (1 << (23 - (-126 - x)));
+  }
+
+  return 0;
+}
