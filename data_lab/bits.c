@@ -7,7 +7,7 @@
  *          This is the file you will hand in to your instructor.
  *
  * WARNING: Do not include the <stdio.h> header; it confuses the dlc
- * compiler. You can still use printf for debugging without including
+ * compiler. You can still use // printf for debugging without including
  * <stdio.h>, although you might get a compiler warning. In general,
  * it's not good practice to ignore compiler warnings, but in this
  * case it's OK.
@@ -206,7 +206,11 @@ int isAsciiDigit(int x) {
  *   Max ops: 16
  *   Rating: 3
  */
-int conditional(int x, int y, int z) { return 2; }
+int conditional(int x, int y, int z) {
+  int first_cond = (!!x) << 31 >> 31;
+  int second_cond = (!x) << 31 >> 31;
+  return (y & first_cond) | (z & second_cond);
+}
 /*
  * isLessOrEqual - if x <= y  then return 1, else return 0
  *   Example: isLessOrEqual(4,5) = 1.
@@ -214,7 +218,11 @@ int conditional(int x, int y, int z) { return 2; }
  *   Max ops: 24
  *   Rating: 3
  */
-int isLessOrEqual(int x, int y) { return 2; }
+int isLessOrEqual(int x, int y) {
+  int tmin_mask = 1 << 31;
+  int y_min_x = y + (~x + 1); // y - x
+  return !(tmin_mask & y_min_x);
+}
 // 4
 /*
  * logicalNeg - implement the ! operator, using all of
@@ -224,7 +232,17 @@ int isLessOrEqual(int x, int y) { return 2; }
  *   Max ops: 12
  *   Rating: 4
  */
-int logicalNeg(int x) { return 2; }
+int logicalNeg(int x) {
+  int tmin_mask = 1 << 31;
+  int test_cond = (x & tmin_mask) |
+                  ((~x + 1) & tmin_mask); // test_cond == 0 <=> x == 0 else TMIN
+  int test_cond_moved =
+      test_cond >> 31; // test_cond_moved == 0 <=> x == 0 else 0xFFFFFFFF
+  int inverse_test_cond_moved =
+      ~test_cond_moved; // itcm == 0xFFFFFFFF <=> x == 0 else 0
+  return ~(inverse_test_cond_moved) + 1;
+}
+
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
  *  Examples: howManyBits(12) = 5
@@ -237,7 +255,53 @@ int logicalNeg(int x) { return 2; }
  *  Max ops: 90
  *  Rating: 4
  */
-int howManyBits(int x) { return 0; }
+int howManyBits(int x) {
+  int res, test16, shift16, test8, shift8, test4, shift4, test2, shift2, test1,
+      shift1;
+  res = 32;
+  test16 = !((x << 16 >> 16) ^ x); // 1 if fits 16 bits, 0 else
+  // printf("test16: %d\n", test16);
+  shift16 = (~((~test16 + 1) & 16) + 1); // -16 if fits 16 bits, 0 else
+  // printf("shift16: %d\n", shift16);
+  res += shift16; // res -= 16 if fits 16
+  x >>= (16 + shift16);
+  // printf("x: %b\n", x);
+
+  test8 = !((x << 24 >> 24) ^ x); // 0 if fits 8 bits, 1 else
+  // printf("test8: %d\n", test8);
+  shift8 = (~((~test8 + 1) & 8) + 1); // -8 if fits 8 bits, 0 else
+  // printf("shift8: %d\n", shift8);
+  res += shift8;
+  x >>= (8 + shift8);
+  // printf("x: %b\n", x);
+
+  test4 = !((x << 28 >> 28) ^ x);
+  // printf("test4: %d\n", test4);
+  shift4 = (~((~test4 + 1) & 4) + 1);
+  // printf("shift4: %d\n", shift4);
+  res += shift4;
+  x >>= (4 + shift4);
+  // printf("x: %b\n", x);
+
+  test2 = !((x << 30 >> 30) ^ x);
+  // printf("test2: %d\n", test2);
+  shift2 = (~((~test2 + 1) & 2) + 1);
+  // printf("shift2: %d\n", shift2);
+  res += shift2;
+  x >>= (2 + shift2);
+  // printf("x: %b\n", x);
+
+  test1 = !((x << 31 >> 31) ^ x);
+  // printf("test1: %d\n", test1);
+  shift1 = (~((~test1 + 1) & 1) + 1);
+  // printf("shift1: %d\n", shift1);
+  res += shift1;
+  x >>= (1 + shift1);
+  // printf("x: %b\n", x);
+
+  return res;
+}
+
 // float
 /*
  * floatScale2 - Return bit-level equivalent of expression 2*f for
