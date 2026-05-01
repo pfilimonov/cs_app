@@ -1,42 +1,43 @@
 
 .globl main
 main:
-	movq	$3, -32(%rsp)
-	movq	$1, -24(%rsp)
-	movq	$4, -16(%rsp)
-	movq	$2, -8(%rsp)
-	movq	$5, (%rsp)
-  subq 40, %rsp
-
+	subq $40, %rsp
+  movq $3, 0(%rsp)
+  movq $1, 8(%rsp)
+  movq $4, 16(%rsp)
+  movq $2, 24(%rsp)
+  movq $5, 32(%rsp)
   movq %rsp, %rdi 
 	movl	$5, %esi
 	call	bubble_b
   
   # Test
-  movq -32(%rsp), %rdx
-  movq -24(%rsp), %rcx
+  movq (%rsp), %rdx
+  movq 8(%rsp), %rcx
   sub %rcx, %rdx
   jg .fail
 
-  movq -24(%rsp), %rdx
-  movq -16(%rsp), %rcx
+  movq 8(%rsp), %rdx
+  movq 16(%rsp), %rcx
   sub %rcx, %rdx
   jg .fail
 
-  movq -16(%rsp), %rdx
-  movq -8(%rsp), %rcx
+  movq 16(%rsp), %rdx
+  movq 24(%rsp), %rcx
   sub %rcx, %rdx
   jg .fail
 
-  movq -8(%rsp), %rdx
-  movq (%rsp), %rcx
+  movq 24(%rsp), %rdx
+  movq 32(%rsp), %rcx
   sub %rcx, %rdx
   jg .fail
 
+  addq $40, %rsp
   movq $0, %rax
   ret
 
 .fail:
+  addq $40, %rsp
   movq $1, %rax
   ret
   
@@ -51,26 +52,18 @@ bubble_b:
   # inner loop
   # i
   movq $0, %r9
+  movq %rdi, %rdx # copy pointer to increment
 .iloop:
   movq %r8, %r10 # copy last
   subq %r9, %r10
   jle .donei
   
-  # Test
+  # Test condition
   # Get data[i]
-  movq $0, %r10
-  movq %rdi, %rdx # copy pointer to increment
-.incrptr:
-  movq %r9, %r11
-  subq %r10, %r11
-  jle .doneiptr
-  addq $1, %r10
-  addq $8, %rdx
-  jmp .incrptr
-.doneiptr:
   movq (%rdx), %rcx # data[i]
   movq 8(%rdx), %rbx # data[i+1]
-  subq %rcx, %rbx  
+  movq %rbx, %rbp
+  subq %rcx, %rbp  
   cmovl %rbx, %rbp # t
   cmovl %rcx, %rbx
   cmovl %rbp, %rcx
@@ -78,7 +71,10 @@ bubble_b:
   movq %rcx, (%rdx)
   movq %rbx, 8(%rdx)
 
+  # End test condition
+
   addq $1, %r9 # increment i
+  addq $8, %rdx
   jmp .iloop
 
 .donei:
