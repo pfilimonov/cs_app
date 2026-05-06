@@ -304,29 +304,53 @@ word Stat = [
 
 ################ Pipeline Register Control #########################
 
+
 # Should I stall or inject a bubble into Pipeline Register F?
 # At most one of these can be true.
 bool F_bubble = 0;
-bool F_stall =
-	# Modify the following to stall the update of pipeline register F
-	0 ||
+bool F_stall = ((
+    (
+      d_srcA != RNONE  &&
+      d_srcA in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    ) ||
+    (
+      d_srcB != RNONE  &&
+      d_srcB in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    )
+  )
+ ||
 	# Stalling at fetch while ret passes through pipeline
-	IRET in { D_icode, E_icode, M_icode };
+	IRET in { D_icode, E_icode, M_icode }) && !(E_icode == IJXX && !e_Cnd);
 
 # Should I stall or inject a bubble into Pipeline Register D?
 # At most one of these can be true.
-bool D_stall = 
-	# Modify the following to stall the instruction in decode
-	0;
+bool D_stall = (
+    (
+      d_srcA != RNONE  &&
+      d_srcA in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    ) ||
+    (
+      d_srcB != RNONE  &&
+      d_srcB in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    )
+  ) && !(E_icode == IJXX && !e_Cnd);
 
 bool D_bubble =
 	# Mispredicted branch
 	(E_icode == IJXX && !e_Cnd) ||
 	# Stalling at fetch while ret passes through pipeline
-	!(E_icode in { IMRMOVQ, IPOPQ } && E_dstM in { d_srcA, d_srcB }) &&
-	# but not condition for a generate/use hazard
-	!0 &&
-	  IRET in { D_icode, E_icode, M_icode };
+	(!(
+    (
+      d_srcA != RNONE  &&
+      d_srcA in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    ) ||
+    (
+      d_srcB != RNONE  &&
+      d_srcB in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    )
+  )
+ &&
+	  IRET in { D_icode, E_icode, M_icode });
 
 # Should I stall or inject a bubble into Pipeline Register E?
 # At most one of these can be true.
@@ -335,7 +359,16 @@ bool E_bubble =
 	# Mispredicted branch
 	(E_icode == IJXX && !e_Cnd) ||
 	# Modify the following to inject bubble into the execute stage
-	0;
+	(
+    (
+      d_srcA != RNONE  &&
+      d_srcA in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    ) ||
+    (
+      d_srcB != RNONE  &&
+      d_srcB in { e_dstE, E_dstM, M_dstM, M_dstE, W_dstM, W_dstE }
+    )
+  );
 
 # Should I stall or inject a bubble into Pipeline Register M?
 # At most one of these can be true.
