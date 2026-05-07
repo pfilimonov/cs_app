@@ -1,6 +1,6 @@
 # Modify this line to indicate the default version to build
 
-VERSION=nt
+VERSION=btfnt
 
 # Comment this out if you don't have Tcl/Tk on your system
 
