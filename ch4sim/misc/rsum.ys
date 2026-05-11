@@ -1,0 +1,42 @@
+	.pos 0 
+	irmovq stack, %rsp  	# Set up stack pointer  
+	call main		# Execute main program
+	halt			# Terminate program 
+
+# Sample linked list
+.align 8
+list:
+ele1:
+.quad 0x00a
+.quad ele2
+ele2:
+.quad 0x0b0
+.quad ele3
+ele3:
+.quad 0xc00
+.quad 0
+
+rsum_list:
+  pushq %rbp
+  xorq %rax, %rax
+  subq %rax, %rdi
+  je done
+  mrmovq (%rdi), %rbp # long val = ls->val;
+  mrmovq 8(%rdi), %rdi 
+  call rsum_list
+  addq %rbp, %rax
+done:
+  popq %rbp
+  ret
+
+  
+
+main:
+  irmovq list, %rdi
+  call rsum_list
+  halt
+  
+# The stack starts here and grows to lower addresses
+	.pos 0x200		
+stack:	 
+
