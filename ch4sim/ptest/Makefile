@@ -1,5 +1,5 @@
-SIM=../pipe/psim
-TFLAGS=
+SIM=../seq/ssim
+TFLAGS=-i
 
 ISADIR = ../misc
 YAS=$(ISADIR)/yas
