@@ -34,8 +34,7 @@ ncopy:
 	jle Done		# if so, goto Done:
 
 Loop:	mrmovq (%rdi), %r10	# read val from src...
-  iaddq $-1, %rdx		# len--
-	iaddq $8, %rdi		# src++
+  	iaddq $8, %rdi		# src++
 	rmmovq %r10, (%rsi)	# ...and store it to dst
   iaddq $8, %rsi		# dst++
 
@@ -44,7 +43,7 @@ Loop:	mrmovq (%rdi), %r10	# read val from src...
 	iaddq $1, %rax		# count++
 Npos:	
 	
-	andq %rdx,%rdx		# len > 0?
+	iaddq $-1, %rdx		# len--
 	jg Loop			# if so, goto Loop:
 ##################################################################
 # Do not modify the following section of code
@@ -62,10 +61,10 @@ EndFun:
 ###############################
 	.align 8
 src:
-	.quad 1
-	.quad -2
-	.quad 3
-	.quad -4
+	.quad -1
+	.quad 2
+	.quad -3
+	.quad 4
 	.quad 0xbcdefa # This shouldn't get moved
 
 	.align 16
