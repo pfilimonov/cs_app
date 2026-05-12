@@ -34,14 +34,16 @@
 0x036: 719100000000000000   | 	jle Done		# if so, goto Done:
                             | 
 0x03f: 50a70000000000000000 | Loop:	mrmovq (%rdi), %r10	# read val from src...
-0x049: 40a60000000000000000 | 	rmmovq %r10, (%rsi)	# ...and store it to dst
-0x053: 62aa                 | 	andq %r10, %r10		# val <= 0?
-0x055: 716800000000000000   | 	jle Npos		# if so, goto Npos:
-0x05e: c0f00100000000000000 | 	iaddq $1, %rax		# count++
-0x068:                      | Npos:	
-0x068: c0f2ffffffffffffffff | 	iaddq $-1, %rdx		# len--
-0x072: c0f70800000000000000 | 	iaddq $8, %rdi		# src++
-0x07c: c0f60800000000000000 | 	iaddq $8, %rsi		# dst++
+0x049: c0f2ffffffffffffffff |   iaddq $-1, %rdx		# len--
+0x053: c0f70800000000000000 | 	iaddq $8, %rdi		# src++
+0x05d: 40a60000000000000000 | 	rmmovq %r10, (%rsi)	# ...and store it to dst
+0x067: c0f60800000000000000 |   iaddq $8, %rsi		# dst++
+                            | 
+0x071: 62aa                 | 	andq %r10, %r10		# val <= 0?
+0x073: 718600000000000000   | 	jle Npos		# if so, goto Npos:
+0x07c: c0f00100000000000000 | 	iaddq $1, %rax		# count++
+0x086:                      | Npos:	
+                            | 	
 0x086: 6222                 | 	andq %rdx,%rdx		# len > 0?
 0x088: 763f00000000000000   | 	jg Loop			# if so, goto Loop:
                             | ##################################################################
@@ -61,8 +63,8 @@
 0x098:                      | 	.align 8
 0x098:                      | src:
 0x098: 0100000000000000     | 	.quad 1
-0x0a0: 0200000000000000     | 	.quad 2
-0x0a8: fdffffffffffffff     | 	.quad -3
+0x0a0: feffffffffffffff     | 	.quad -2
+0x0a8: 0300000000000000     | 	.quad 3
 0x0b0: fcffffffffffffff     | 	.quad -4
 0x0b8: fadebc0000000000     | 	.quad 0xbcdefa # This shouldn't get moved
                             | 
