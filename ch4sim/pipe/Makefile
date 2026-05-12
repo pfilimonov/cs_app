@@ -1,6 +1,6 @@
 # Modify this line to indicate the default version to build
 
-VERSION=1w
+VERSION=full
 
 # Comment this out if you don't have Tcl/Tk on your system
 
