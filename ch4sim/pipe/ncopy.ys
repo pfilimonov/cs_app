@@ -17,21 +17,43 @@ ncopy:
 # You can modify this portion
 	# Loop header
 	xorq %rax,%rax		# count = 0;
-	andq %rdx,%rdx		# len <= 0?
-	jle Done		# if so, goto Done:
+	iaddq $-2,%rdx	
+	jl Rem
 
 Loop:	mrmovq (%rdi), %r10	# read val from src...
-  	iaddq $8, %rdi		# src++
+  mrmovq 8(%rdi), %r11
+
+  iaddq $16, %rdi		# src++
 	rmmovq %r10, (%rsi)	# ...and store it to dst
-  iaddq $8, %rsi		# dst++
+  rmmovq %r11, 8(%rsi)
+  iaddq $16, %rsi		# dst++
 
 	andq %r10, %r10		# val <= 0?
-	jle Npos		# if so, goto Npos:
+	jle CheckSec
 	iaddq $1, %rax		# count++
-Npos:	
-	
-	iaddq $-1, %rdx		# len--
+CheckSec:
+  andq %r11, %r11
+  jle Continue
+  iaddq $1, %rax
+Continue:		
+	iaddq $-2, %rdx		# len--
 	jg Loop			# if so, goto Loop:
+
+Rem:
+    iaddq $2, %rdx
+    jle Done
+RemLoop:
+    mrmovq (%rdi), %r10
+    iaddq $8, %rdi
+    rmmovq %r10, (%rsi)
+    iaddq $8, %rsi
+    andq %r10, %r10
+    jle RemNpos 
+    iaddq $1, %rax
+RemNpos:
+  iaddq $-1, %rdx
+  jg RemLoop
+
 ##################################################################
 # Do not modify the following section of code
 # Function epilogue.
