@@ -1,3 +1,4 @@
+
 #/* $begin ncopy-ys */
 ##################################################################
 # ncopy.ys - Copy a src block of len words to dst.
@@ -17,7 +18,6 @@ ncopy:
 # You can modify this portion
 	# Loop header
 
-xorq %rax,%rax		# count = 0;
 
 Part8:
 	iaddq $-8,%rdx	
