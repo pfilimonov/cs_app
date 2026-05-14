@@ -112,7 +112,6 @@ Check44:
   iaddq $1, %rax
 Continue4:		
 	iaddq $-4, %rdx		# len--
-	jg Loop4			# if so, goto Loop:
 
 Part2:
   iaddq $2, %rdx #+ 4 - 2
@@ -133,7 +132,6 @@ Check22:
   iaddq $1, %rax
 Continue2:
   iaddq $-2, %rdx
-  jg Loop2
 
 
 Part1:
