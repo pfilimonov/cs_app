@@ -45,11 +45,11 @@ endif()
 # ════════════════════════════════════════════════════════════════
 
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+  set(CMAKE_BUILD_TYPE Debug)
 endif()
 
 add_executable(csapp
-    src/ch4/p447.c
+    src/ch5/p516.c
 )
 
 target_include_directories(csapp PRIVATE
