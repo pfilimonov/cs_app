@@ -49,7 +49,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 add_executable(csapp
-    src/ch6/p645.c
+    src/ch6/p646.c
 )
 
 target_include_directories(csapp PRIVATE

@@ -35,7 +35,7 @@ void measure_perf(void (*f)(int *, int *, int), int N) {
     uint64_t s = rdtsc();
     f(dst, src, N);
     uint64_t e = rdtsc();
-    double cpe = (double)(e - s) / N;
+    double cpe = (double)(e - s) / N / N;
     if (cpe < min_cpe)
       min_cpe = cpe;
   }
