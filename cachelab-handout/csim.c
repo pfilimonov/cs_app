@@ -228,15 +228,19 @@ void parseTrace(char *file, cache_t *cache, int *misses, int *hits,
     error(1, 2, "Can't open the file %s\n", file);
 
   char buf[100];
-  while (fscanf(f, "%s\n", buf) == 1) {
+  while (fgets(buf, sizeof(buf), f)) {
     if (strlen(buf) < 1)
       continue;
-    if (buf[0] == 'I')
+    if (buf[0] == 'I' || buf[0] == '\n')
       continue;
+
     char op;
     unsigned long addr;
     int size;
+    printf("Trace line: %s\n", buf);
     sscanf(buf, " %c %lu,%d\n", &op, &addr, &size);
+
+    printf(" %c %lu,%d\n", op, addr, size);
 
     if (op != 'L' && op != 'M' && op != 'S')
       continue;
