@@ -3,14 +3,18 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include <limits.h>
 
 #define PTR_SIZE sizeof(void *)
+
+unsigned COUNTER = 0;
 
 typedef struct {
   char valid;
   int B;
   int tag;
   char *block;
+  unsigned last_touch;
 } line_t;
 
 typedef struct {
@@ -111,11 +115,18 @@ CacheRes touchCache(cache_t *cache, unsigned long addr, int size,
   parseAddr(cache->b, cache->s, addr, &tag, &set_idx, &block_offset);
 
   line_t *free_line = NULL;
+  line_t *lru_line = NULL;
+  unsigned min_touch_time = UINT_MAX;
 
   for (int j = 0; j < cache->E; j++) {
     line_t *line = &(cache->sets[set_idx].lines[j]);
+    if (line->last_touch < min_touch_time) {
+      min_touch_time = line->last_touch;
+      lru_line = line;
+    }
     if (line->tag == tag && line->valid) {
       res = Hit;
+      line->last_touch = ++COUNTER;
       break;
     } else if (!line->valid && !free_line) {
       free_line = line;
@@ -124,11 +135,13 @@ CacheRes touchCache(cache_t *cache, unsigned long addr, int size,
 
   if (res == Miss) {
     if (!free_line)
-      free_line = &(cache->sets[set_idx].lines[rand() % cache->E]); // random
+      free_line = lru_line; //&(cache->sets[set_idx].lines[rand() % cache->E]);
+                            //// random
 
     *evicted = free_line->valid != 0;
     free_line->tag = tag;
     free_line->valid = 1;
+    free_line->last_touch = ++COUNTER;
   }
 
   return res;
