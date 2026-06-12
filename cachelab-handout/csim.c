@@ -238,9 +238,9 @@ void parseTrace(char *file, cache_t *cache, int *misses, int *hits,
     unsigned long addr;
     int size;
     printf("Trace line: %s\n", buf);
-    sscanf(buf, " %c %lu,%d\n", &op, &addr, &size);
+    sscanf(buf, " %c %lx,%d\n", &op, &addr, &size);
 
-    printf(" %c %lu,%d\n", op, addr, size);
+    printf(" %c %lx,%d\n", op, addr, size);
 
     if (op != 'L' && op != 'M' && op != 'S')
       continue;
