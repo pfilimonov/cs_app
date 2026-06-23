@@ -61,6 +61,7 @@ cache_t *initCache(int s, int E, int b) {
       cache->sets[i].lines[j].tag = 0;
       cache->sets[i].lines[j].B = B;
       cache->sets[i].lines[j].block = calloc(B, sizeof(char));
+      cache->sets[i].lines[j].last_touch = 0;
       if (!cache->sets[i].lines[j].block)
         return NULL;
     }
