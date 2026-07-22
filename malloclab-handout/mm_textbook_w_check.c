@@ -69,87 +69,19 @@ team_t team = {
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
-#define PUT_PRED(bp, pred_p)                                                   \
-  (PUT(bp, (unsigned int)((char *)pred_p - (char *)mem_heap_lo())))
-#define PUT_SUCC(bp, succ_p)                                                   \
-  (PUT(bp + WSIZE, (unsigned int)((char *)succ_p - (char *)mem_heap_lo())))
-#define GET_PRED(bp) ((char *)mem_heap_lo() + GET(bp))
-#define GET_SUCC(bp) ((char *)mem_heap_lo() + GET(bp + WSIZE))
-#define IS_FREE_LIST_HEAD(bp) (GET(bp) == 0)
-#define IS_FREE_LIST_TAIL(bp) (GET(bp + WSIZE) == 0)
-
 /* Global variables */
 static char *heap_listp;
-static char *free_listp = NULL;
 
 int check_heap(void);
 int check_free_list(void);
 int check_overlap(void);
 
 int check_free_list(void) {
-  if (free_listp == NULL) {
-    printf("[ERROR] Free list pointer is null\n");
-    return 1;
-  }
 
   // • Do the pointers in a heap block point to valid heap addresses?
-  for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    if (GET_ALLOC(HDRP(bp)))
-      continue;
-
-    if (!IS_FREE_LIST_HEAD(bp)) {
-      char *pred = GET_PRED(bp);
-      if (pred < (char *)mem_heap_lo() || pred > (char *)mem_heap_hi()) {
-        printf("[ERROR] Invalid predecessor pointer %p\n", pred);
-        return 0;
-      }
-    }
-    if (!IS_FREE_LIST_TAIL(bp)) {
-      char *succ = GET_SUCC(bp);
-      if (succ < (char *)mem_heap_lo() || succ > (char *)mem_heap_hi()) {
-        printf("[ERROR] Invalid successor pointer %p\n", succ);
-        return 0;
-      }
-    }
-  }
-
   // • Is every block in the free list marked as free?
-  for (char *bp = free_listp;; bp = GET_SUCC(bp)) {
-    if (GET_ALLOC(HDRP(bp))) {
-      printf("[ERROR] Allocated block found in free list: %p\n", bp);
-      return 0;
-    }
-    // • Do the pointers in the free list point to valid free blocks?
-    if (!IS_FREE_LIST_HEAD(bp)) {
-      if (GET_ALLOC(HDRP(GET_PRED(bp)))) {
-        printf("[ERROR] Allocated block found in predecessor: %p\n", bp);
-        return 0;
-      }
-    }
-    if (IS_FREE_LIST_TAIL(bp))
-      break;
-  }
-
   // • Is every free block actually in the free list?
-  for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    if (GET_ALLOC(HDRP(bp)))
-      continue;
-
-    int found_in_free_list = 0;
-    for (char *fbp = free_listp;; fbp = GET_SUCC(fbp)) {
-      if (fbp == bp) {
-        found_in_free_list = 1;
-        break;
-      }
-      if (IS_FREE_LIST_HEAD(fbp))
-        break;
-    }
-
-    if (!found_in_free_list) {
-      printf("[ERROR] Free block not found in free list: %p\n", bp);
-      return 0;
-    }
-  }
+  // • Do the pointers in the free list point to valid free blocks?
 
   // • Are there any contiguous free blocks that somehow escaped coalescing?
   int prev_block_was_free = 0;

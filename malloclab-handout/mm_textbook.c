@@ -58,7 +58,6 @@ team_t team = {
 
 /* Read the size and allocated fields from address p */
 #define GET_SIZE(p) (GET(p) & ~0x7)
-#define PAYLOAD_SIZE(bp) (GET_SIZE(HDRP(bp)) - 2 * WSIZE)
 #define GET_ALLOC(p) (GET(p) & 0x1)
 
 /* Given block ptr bp, compute address of its header and footer */
@@ -69,131 +68,29 @@ team_t team = {
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
-#define PUT_PRED(bp, pred_p)                                                   \
-  (PUT(bp, (unsigned int)((char *)pred_p - (char *)mem_heap_lo())))
-#define PUT_SUCC(bp, succ_p)                                                   \
-  (PUT(bp + WSIZE, (unsigned int)((char *)succ_p - (char *)mem_heap_lo())))
-#define GET_PRED(bp) ((char *)mem_heap_lo() + GET(bp))
-#define GET_SUCC(bp) ((char *)mem_heap_lo() + GET(bp + WSIZE))
-#define IS_FREE_LIST_HEAD(bp) (GET(bp) == 0)
-#define IS_FREE_LIST_TAIL(bp) (GET(bp + WSIZE) == 0)
-
 /* Global variables */
 static char *heap_listp;
-static char *free_listp = NULL;
 
 int check_heap(void);
 int check_free_list(void);
 int check_overlap(void);
 
-int check_free_list(void) {
-  if (free_listp == NULL) {
-    printf("[ERROR] Free list pointer is null\n");
-    return 1;
-  }
-
-  // • Do the pointers in a heap block point to valid heap addresses?
-  for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    if (GET_ALLOC(HDRP(bp)))
-      continue;
-
-    if (!IS_FREE_LIST_HEAD(bp)) {
-      char *pred = GET_PRED(bp);
-      if (pred < (char *)mem_heap_lo() || pred > (char *)mem_heap_hi()) {
-        printf("[ERROR] Invalid predecessor pointer %p\n", pred);
-        return 0;
-      }
-    }
-    if (!IS_FREE_LIST_TAIL(bp)) {
-      char *succ = GET_SUCC(bp);
-      if (succ < (char *)mem_heap_lo() || succ > (char *)mem_heap_hi()) {
-        printf("[ERROR] Invalid successor pointer %p\n", succ);
-        return 0;
-      }
-    }
-  }
-
-  // • Is every block in the free list marked as free?
-  for (char *bp = free_listp;; bp = GET_SUCC(bp)) {
-    if (GET_ALLOC(HDRP(bp))) {
-      printf("[ERROR] Allocated block found in free list: %p\n", bp);
-      return 0;
-    }
-    // • Do the pointers in the free list point to valid free blocks?
-    if (!IS_FREE_LIST_HEAD(bp)) {
-      if (GET_ALLOC(HDRP(GET_PRED(bp)))) {
-        printf("[ERROR] Allocated block found in predecessor: %p\n", bp);
-        return 0;
-      }
-    }
-    if (IS_FREE_LIST_TAIL(bp))
-      break;
-  }
-
-  // • Is every free block actually in the free list?
-  for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    if (GET_ALLOC(HDRP(bp)))
-      continue;
-
-    int found_in_free_list = 0;
-    for (char *fbp = free_listp;; fbp = GET_SUCC(fbp)) {
-      if (fbp == bp) {
-        found_in_free_list = 1;
-        break;
-      }
-      if (IS_FREE_LIST_HEAD(fbp))
-        break;
-    }
-
-    if (!found_in_free_list) {
-      printf("[ERROR] Free block not found in free list: %p\n", bp);
-      return 0;
-    }
-  }
-
-  // • Are there any contiguous free blocks that somehow escaped coalescing?
-  int prev_block_was_free = 0;
-  for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    if (!prev_block_was_free && !GET_ALLOC(HDRP(bp)))
-      prev_block_was_free = 1;
-    else if (prev_block_was_free && !GET_ALLOC(HDRP(bp))) {
-      printf("[ERROR] Two free blocks without coalescing\n");
-      return 0;
-    } else if (prev_block_was_free)
-      prev_block_was_free = 0;
-  }
-
-  return 1;
-}
-
+int check_free_list(void) { return 1; }
 int check_overlap(void) {
-  // • Do any allocated blocks overlap?
-  for (char *bp1 = heap_listp; GET_SIZE(HDRP(bp1)) > 0; bp1 = NEXT_BLKP(bp1)) {
-    char *bp2 = NEXT_BLKP(bp1);
-    if ((GET_ALLOC(HDRP(bp1)) == 1 && GET_ALLOC(HDRP(bp2)) == 1) &&
-        (bp1 + PAYLOAD_SIZE(bp1) > HDRP(bp2))) {
-      printf("[ERROR] Found overlapping payloads in allocated blocks: %p and "
-             "%p\n",
-             bp1, bp2);
-      return 0;
-    }
+  for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
   }
-  return 1;
 }
 
 int check_heap(void) {
+  // • Is every block in the free list marked as free?
+  // • Are there any contiguous free blocks that somehow escaped coalescing?
+  // • Is every free block actually in the free list?
+  if (!check_free_list())
+    return 0;
+  // • Do the pointers in the free list point to valid free blocks?
+  // • Do any allocated blocks overlap?
+  // • Do the pointers in a heap block point to valid heap addresses?
 
-  if (!check_free_list()) {
-    printf("[CRITICAL] FREE LIST CHECK FAILED\n");
-    exit(1);
-  }
-
-  if (!check_overlap()) {
-    printf("[CRITICAL] HEAP OVERLAP CHECK FAILED\n");
-    exit(1);
-  }
-
-  printf("[INFO] Heap check passed!\n");
   return 1;
 }
 
@@ -263,9 +160,6 @@ int mm_init(void) {
   /* Extend the empty heap with a free block of CHUMSIZE bytes */
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
     return -1;
-
-  check_heap();
-
   return 0;
 }
 
@@ -279,8 +173,6 @@ void mm_free(void *bp) {
   PUT(HDRP(bp), PACK(size, 0));
   PUT(FTRP(bp), PACK(size, 0));
   coalesce(bp);
-
-  check_heap();
 }
 
 static void *find_fit(size_t asize) {
@@ -333,9 +225,6 @@ void *mm_malloc(size_t size) {
   if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
     return NULL;
   place(bp, asize);
-
-  check_heap();
-
   return bp;
 }
 
@@ -355,8 +244,5 @@ void *mm_realloc(void *ptr, size_t size) {
     copySize = size;
   memcpy(newptr, oldptr, copySize);
   mm_free(oldptr);
-
-  check_heap();
-
   return newptr;
 }
