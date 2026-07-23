@@ -73,14 +73,18 @@ team_t team = {
   (PUT(bp, (unsigned int)((char *)pred_p - (char *)mem_heap_lo())))
 #define PUT_SUCC(bp, succ_p)                                                   \
   (PUT(bp + WSIZE, (unsigned int)((char *)succ_p - (char *)mem_heap_lo())))
+#define CLEAR_PRED(bp) (PUT(bp, 0))
+#define CLEAR_SUCC(bp) (PUT(bp + WSIZE, 0))
 #define GET_PRED(bp) ((char *)mem_heap_lo() + GET(bp))
-#define GET_SUCC(bp) ((char *)mem_heap_lo() + GET(bp + WSIZE))
+#define GET_SUCC(bp) ((char *)mem_heap_lo() + GET((char *)bp + WSIZE))
 #define IS_FREE_LIST_HEAD(bp) (GET(bp) == 0)
-#define IS_FREE_LIST_TAIL(bp) (GET(bp + WSIZE) == 0)
+#define IS_FREE_LIST_TAIL(bp) (GET((char *)bp + WSIZE) == 0)
 
 /* Global variables */
 static char *heap_listp;
 static char *free_listp = NULL;
+
+static void dump_free_list(void);
 
 int check_heap(void);
 int check_free_list(void);
@@ -116,13 +120,14 @@ int check_free_list(void) {
   // • Is every block in the free list marked as free?
   for (char *bp = free_listp;; bp = GET_SUCC(bp)) {
     if (GET_ALLOC(HDRP(bp))) {
-      printf("[ERROR] Allocated block found in free list: %p\n", bp);
+      printf("[ERROR] Allocated block found in free list: %p, %x\n", bp,
+             *HDRP(bp));
       return 0;
     }
     // • Do the pointers in the free list point to valid free blocks?
     if (!IS_FREE_LIST_HEAD(bp)) {
       if (GET_ALLOC(HDRP(GET_PRED(bp)))) {
-        printf("[ERROR] Allocated block found in predecessor: %p\n", bp);
+        printf("[ERROR] Allocated block found in predecessor: %p.\n", bp);
         return 0;
       }
     }
@@ -141,7 +146,7 @@ int check_free_list(void) {
         found_in_free_list = 1;
         break;
       }
-      if (IS_FREE_LIST_HEAD(fbp))
+      if (IS_FREE_LIST_TAIL(fbp))
         break;
     }
 
@@ -185,11 +190,13 @@ int check_heap(void) {
 
   if (!check_free_list()) {
     printf("[CRITICAL] FREE LIST CHECK FAILED\n");
+    dump_free_list();
     exit(1);
   }
 
   if (!check_overlap()) {
     printf("[CRITICAL] HEAP OVERLAP CHECK FAILED\n");
+    dump_free_list();
     exit(1);
   }
 
@@ -197,9 +204,57 @@ int check_heap(void) {
   return 1;
 }
 
-/*
- * mm_init - initialize the malloc package.
- */
+static void delete_from_free_list(char *bp) {
+  if (free_listp == NULL) {
+    printf("[ERROR] Deleting from empty free list\n");
+    exit(1);
+  }
+
+  // update free list
+  if (IS_FREE_LIST_HEAD(bp)) {
+    CLEAR_PRED(GET_SUCC(bp));
+    free_listp = GET_SUCC(bp);
+  } else if (IS_FREE_LIST_TAIL(bp)) {
+    CLEAR_SUCC(GET_PRED(bp));
+  } else {
+    // middle list element
+    PUT_PRED(GET_SUCC(bp), GET_PRED(bp));
+    PUT_SUCC(GET_PRED(bp), GET_SUCC(bp));
+  }
+}
+
+static void insert_into_free_list(char *bp) {
+  if (free_listp == NULL) {
+    // this is the first free block
+    CLEAR_PRED(bp);
+    CLEAR_SUCC(bp);
+  } else {
+    // there are some free blocks already
+    PUT_PRED(free_listp, bp);
+    CLEAR_PRED(bp);
+    PUT_SUCC(bp, free_listp);
+  }
+  free_listp = bp;
+}
+
+static void dump_free_list(void) {
+  printf("\n==========\n[FREE LIST DUMP]\n");
+  if (free_listp == NULL) {
+    printf("NULL\n==========\n");
+    return;
+  }
+
+  for (void *bp = free_listp;; bp = GET_SUCC(bp)) {
+    printf("BLOCK %p:    size=%u | alloc=%d | pred=%p | succ=%p \n", bp,
+           GET_SIZE(HDRP(bp)), GET_ALLOC(HDRP(bp)),
+           IS_FREE_LIST_HEAD(bp) ? NULL : GET_PRED(bp),
+           IS_FREE_LIST_TAIL(bp) ? NULL : GET_SUCC(bp));
+    if (IS_FREE_LIST_TAIL(bp)) {
+      printf("\n==========\n");
+      return;
+    }
+  }
+}
 
 static void *coalesce(void *bp) {
   size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
@@ -211,23 +266,33 @@ static void *coalesce(void *bp) {
   }
 
   else if (prev_alloc && !next_alloc) { /* Case 2 */
+    delete_from_free_list(bp);
+    delete_from_free_list(NEXT_BLKP(bp));
     size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
+    insert_into_free_list(bp);
   }
 
   else if (!prev_alloc && next_alloc) { /* Case 3 */
+    delete_from_free_list(bp);
+    delete_from_free_list(PREV_BLKP(bp));
     size += GET_SIZE(HDRP(PREV_BLKP(bp)));
     PUT(FTRP(bp), PACK(size, 0));
     PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
     bp = PREV_BLKP(bp);
+    insert_into_free_list(bp);
   }
 
   else { /* Case 4 */
+    delete_from_free_list(bp);
+    delete_from_free_list(NEXT_BLKP(bp));
+    delete_from_free_list(PREV_BLKP(bp));
     size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(FTRP(NEXT_BLKP(bp)));
     PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
     PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
     bp = PREV_BLKP(bp);
+    insert_into_free_list(bp);
   }
   return bp;
 }
@@ -238,6 +303,9 @@ static void *extend_heap(size_t words) {
 
   /* Allocate an even number of words to maintain alignment */
   size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
+  if (size < WSIZE * 4) // hdr + ftr + succ + pred
+    size = WSIZE * 4;
+
   if ((long)(bp = mem_sbrk(size)) == -1)
     return NULL;
 
@@ -246,10 +314,15 @@ static void *extend_heap(size_t words) {
   PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */
   PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
 
+  insert_into_free_list(bp);
+
   /* Coalesce if the previous block was free */
   return coalesce(bp);
 }
 
+/*
+ * mm_init - initialize the malloc package.
+ */
 int mm_init(void) {
   /* Create the initial empty heap */
   if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1)
@@ -278,21 +351,37 @@ void mm_free(void *bp) {
 
   PUT(HDRP(bp), PACK(size, 0));
   PUT(FTRP(bp), PACK(size, 0));
+
+  insert_into_free_list(bp);
   coalesce(bp);
 
   check_heap();
 }
 
 static void *find_fit(size_t asize) {
+  if (free_listp == NULL)
+    return NULL;
+
+  for (void *bp = free_listp;; bp = GET_SUCC(bp)) {
+    if (GET_SIZE(HDRP(bp)) >= asize)
+      return bp;
+
+    if (IS_FREE_LIST_TAIL(bp))
+      break;
+  }
+
+  /*
   for (void *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
     if (!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize)
       return bp;
   }
+  */
 
   return NULL;
 }
 
 static void place(void *bp, size_t asize) {
+  delete_from_free_list(bp);
   size_t csize = GET_SIZE(HDRP(bp));
   if (csize - asize >= DSIZE * 2) {
     size_t asize1 = asize;
@@ -301,6 +390,7 @@ static void place(void *bp, size_t asize) {
     PUT(FTRP(bp), PACK(asize1, 1));
     PUT(HDRP(NEXT_BLKP(bp)), PACK(asize2, 0));
     PUT(FTRP(NEXT_BLKP(bp)), PACK(asize2, 0));
+    insert_into_free_list(NEXT_BLKP(bp));
   } else {
     PUT(HDRP(bp), PACK(csize, 1));
     PUT(FTRP(bp), PACK(csize, 1));
@@ -325,6 +415,7 @@ void *mm_malloc(size_t size) {
   /* Search the free list for a fit */
   if ((bp = find_fit(asize)) != NULL) {
     place(bp, asize);
+    check_heap();
     return bp;
   }
 
