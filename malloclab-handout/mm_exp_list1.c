@@ -1,3 +1,4 @@
+
 /*
  * mm-naive.c - The fastest, least memory-efficient malloc package.
  *
@@ -345,7 +346,7 @@ int mm_init(void) {
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
     return -1;
 
-  // check_heap();
+  check_heap();
 
   return 0;
 }
@@ -364,7 +365,7 @@ void mm_free(void *bp) {
   insert_into_free_list(bp);
   coalesce(bp);
 
-  // check_heap();
+  check_heap();
 
   // dump_free_list("AFTER FREE");
 }
@@ -427,7 +428,7 @@ void *mm_malloc(size_t size) {
   /* Search the free list for a fit */
   if ((bp = find_fit(asize)) != NULL) {
     place(bp, asize);
-    // check_heap();
+    check_heap();
     // dump_free_list("AFTER_MALLOC_FIT");
     // printf("Allocated %p\n", bp);
     return bp;
@@ -441,7 +442,7 @@ void *mm_malloc(size_t size) {
   }
   place(bp, asize);
 
-  // check_heap();
+  check_heap();
   // dump_free_list("AFTER_MALLOC_NO_FIT");
 
   // printf("Allocated %p\n", bp);
@@ -465,7 +466,7 @@ void *mm_realloc(void *ptr, size_t size) {
   memcpy(newptr, oldptr, copySize);
   mm_free(oldptr);
 
-  // check_heap();
+  check_heap();
 
   return newptr;
 }

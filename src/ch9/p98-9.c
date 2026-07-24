@@ -59,7 +59,7 @@ void *Malloc(size_t size) {
  */
 void mem_init(void) {
   mem_heap = (char *)Malloc(MAX_HEAP);
-  mem_brk = (char *)mem_heap;
+  mem_brk = mem_heap + 1;
   mem_max_addr = (char *)(mem_heap + MAX_HEAP);
 }
 
