@@ -1,3 +1,5 @@
+
+
 /*
  * mm-naive.c - The fastest, least memory-efficient malloc package.
  *
@@ -235,13 +237,47 @@ static void insert_into_free_list(char *bp) {
     // this is the first free block
     CLEAR_PRED(bp);
     CLEAR_SUCC(bp);
-  } else {
-    // there are some free blocks already
+    free_listp = bp;
+    return;
+  }
+
+  // there are some free blocks already
+  void *block_with_lesser_addr = NULL;
+  for (void *bp2 = free_listp;; bp2 = GET_SUCC(bp2)) {
+    if ((unsigned long)bp2 > (unsigned long)bp) {
+      if (IS_FREE_LIST_HEAD(bp2))
+        break;
+
+      block_with_lesser_addr = GET_PRED(bp2);
+      break;
+    }
+    if (IS_FREE_LIST_TAIL(bp2)) {
+      block_with_lesser_addr = bp2;
+      break;
+    }
+  }
+
+  if (block_with_lesser_addr == NULL) {
+    // new block goes to head
     PUT_PRED(free_listp, bp);
     CLEAR_PRED(bp);
     PUT_SUCC(bp, free_listp);
+    free_listp = bp;
+
+  } else if (IS_FREE_LIST_TAIL(block_with_lesser_addr)) {
+    // new block goes to tail
+    PUT_SUCC((char *)block_with_lesser_addr, bp);
+    PUT_PRED(bp, block_with_lesser_addr);
+    CLEAR_SUCC(bp);
+
+  } else {
+    // new block goes to the middle
+    char *succ = GET_SUCC(block_with_lesser_addr);
+    PUT_PRED(succ, bp);
+    PUT_SUCC((char *)block_with_lesser_addr, bp);
+    PUT_SUCC(bp, succ);
+    PUT_PRED(bp, block_with_lesser_addr);
   }
-  free_listp = bp;
 }
 
 static void dump_free_list(char *msg) {
