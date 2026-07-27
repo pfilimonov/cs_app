@@ -615,6 +615,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges) {
 
       /* Call the student's realloc */
       oldp = trace->blocks[index];
+
       if ((newp = mm_realloc(oldp, size)) == NULL) {
         malloc_error(tracenum, i, "mm_realloc failed.");
         return 0;
@@ -637,9 +638,12 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges) {
         oldsize = size;
       for (j = 0; j < oldsize; j++) {
         if (newp[j] != (index & 0xFF)) {
-          malloc_error(tracenum, i,
-                       "mm_realloc did not preserve the "
-                       "data from old block");
+          char msg_[100];
+          sprintf(msg_,
+                  "mm_realloc did not preserve the "
+                  "data from old block. Expected %d, got %d. Index=%d",
+                  (index & 0xFF), newp[j], index);
+          malloc_error(tracenum, i, msg_);
           return 0;
         }
       }
