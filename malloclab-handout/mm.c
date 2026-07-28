@@ -80,17 +80,45 @@ team_t team = {
 #define IS_FREE_LIST_HEAD(bp) (GET(bp) == 0)
 #define IS_FREE_LIST_TAIL(bp) (GET((char *)bp + WSIZE) == 0)
 
+// segregated lists
+int msb_index(unsigned x) {
+  x |= x >> 1;
+  x |= x >> 2;
+  x |= x >> 4;
+  x |= x >> 8;
+  x |= x >> 16;
+  // теперь x = 0...0 1...1, где число единиц = позиция msb + 1
+
+  // popcount через ту же технику parallel bits
+  unsigned c = x - ((x >> 1) & 0x55555555);
+  c = (c & 0x33333333) + ((c >> 2) & 0x33333333);
+  c = (c + (c >> 4)) & 0x0f0f0f0f;
+  c = c + (c >> 8);
+  c = c + (c >> 16);
+  return (int)(c & 0x3f) - 1;
+}
+#define N_LISTS 10
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define GET_CLASS_BY_SIZE(size) (MIN(msb_index(size), N_LISTS - 1))
+#define IS_FREE_LIST_INITIALIZED(n)                                            \
+  (GET((char *)mem_heap_lo() + n * WSIZE) != 0)
+#define GET_FREE_LIST_HEAD(n)                                                  \
+  ((char *)mem_heap_lo() + GET(((char *)mem_heap_lo() + n * WSIZE)))
+#define CLEAR_FREE_LIST_HEAD(n) PUT(((char *)mem_heap_lo() + n * WSIZE), 0)
+#define PUT_FREE_LIST_HEAD(bp, n)                                              \
+  (PUT(((char *)mem_heap_lo() + n * WSIZE),                                    \
+       (unsigned int)((char *)bp - (char *)mem_heap_lo())))
+
 /* Global variables */
 static char *heap_listp;
-static char *free_listp = NULL;
 
-static void dump_free_list(char *msg);
+static void dump_free_list(char *msg, char *free_listp);
 
 int check_heap(void);
-int check_free_list(void);
+int check_free_list(char *free_listp);
 int check_overlap(void);
 
-int check_free_list(void) {
+int check_free_list(char *free_listp) {
   if (free_listp == NULL) {
     // printf("[ERROR] Free list pointer is null\n");
     return 1;
@@ -188,15 +216,16 @@ int check_overlap(void) {
 
 int check_heap(void) {
 
-  if (!check_free_list()) {
-    printf("[CRITICAL] FREE LIST CHECK FAILED\n");
-    dump_free_list("");
-    exit(1);
+  for (int off = 1; off <= N_LISTS; off++) {
+    if (!check_free_list(GET_FREE_LIST_HEAD(off))) {
+      printf("[CRITICAL] FREE LIST CHECK FAILED\n");
+      dump_free_list("", GET_FREE_LIST_HEAD(off));
+      exit(1);
+    }
   }
 
   if (!check_overlap()) {
     printf("[CRITICAL] HEAP OVERLAP CHECK FAILED\n");
-    dump_free_list("");
     exit(1);
   }
 
@@ -207,8 +236,12 @@ int check_heap(void) {
 static void delete_from_free_list(char *bp) {
   // printf("Deleting %p from free list\n", bp);
   // dump_free_list("DELETE");
-  if (free_listp == NULL) {
-    printf("[ERROR] Deleting from empty free list\n");
+
+  int size = GET_SIZE(HDRP(bp));
+  int class = GET_CLASS_BY_SIZE(size);
+
+  if (!IS_FREE_LIST_INITIALIZED(class)) {
+    printf("[ERROR] Deleting from empty free list %d\n", class);
     exit(1);
   }
 
@@ -216,9 +249,9 @@ static void delete_from_free_list(char *bp) {
   if (IS_FREE_LIST_HEAD(bp)) {
     CLEAR_PRED(GET_SUCC(bp));
     if (IS_FREE_LIST_TAIL(bp))
-      free_listp = NULL;
+      CLEAR_FREE_LIST_HEAD(class);
     else
-      free_listp = GET_SUCC(bp);
+      PUT_FREE_LIST_HEAD(GET_SUCC(bp), class);
   } else if (IS_FREE_LIST_TAIL(bp)) {
     CLEAR_SUCC(GET_PRED(bp));
   } else {
@@ -231,20 +264,25 @@ static void delete_from_free_list(char *bp) {
 static void insert_into_free_list(char *bp) {
   // printf("Inserting %p into free list\n", bp);
   // dump_free_list("INSERT");
-  if (free_listp == NULL) {
+
+  int size = GET_SIZE(HDRP(bp));
+  int class = GET_CLASS_BY_SIZE(size);
+
+  if (!IS_FREE_LIST_INITIALIZED(class)) {
     // this is the first free block
     CLEAR_PRED(bp);
     CLEAR_SUCC(bp);
   } else {
+    char *free_listp = GET_FREE_LIST_HEAD(class);
     // there are some free blocks already
     PUT_PRED(free_listp, bp);
     CLEAR_PRED(bp);
     PUT_SUCC(bp, free_listp);
   }
-  free_listp = bp;
+  PUT_FREE_LIST_HEAD(bp, class);
 }
 
-static void dump_free_list(char *msg) {
+static void dump_free_list(char *msg, char *free_listp) {
   printf("\n==========\n[FREE LIST DUMP %s]\n", msg);
   if (free_listp == NULL) {
     printf("NULL\n==========\n");
@@ -331,15 +369,20 @@ static void *extend_heap(size_t words) {
  * mm_init - initialize the malloc package.
  */
 int mm_init(void) {
-  free_listp = NULL;
   /* Create the initial empty heap */
-  if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void *)-1)
+  if ((heap_listp = mem_sbrk(4 * WSIZE + WSIZE * N_LISTS)) == (void *)-1)
     return -1;
-  PUT(heap_listp, 0);                            /* Alignment padding */
-  PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */
-  PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
-  PUT(heap_listp + (3 * WSIZE), PACK(0, 1));     /* Epilogue header */
-  heap_listp += (2 * WSIZE);
+  PUT(heap_listp, 0); /* Alignment padding */
+  // free lists
+  for (int off = 1; off <= N_LISTS; off++) {
+    PUT(heap_listp + (off * WSIZE), 0);
+  }
+  PUT(heap_listp + ((N_LISTS + 1) * WSIZE),
+      PACK(DSIZE, 1)); /* Prologue header */
+  PUT(heap_listp + ((N_LISTS + 2) * WSIZE),
+      PACK(DSIZE, 1));                                   /* Prologue footer */
+  PUT(heap_listp + ((N_LISTS + 3) * WSIZE), PACK(0, 1)); /* Epilogue header */
+  heap_listp += (2 * WSIZE) + WSIZE * N_LISTS;
 
   /* Extend the empty heap with a free block of CHUMSIZE bytes */
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
@@ -370,23 +413,20 @@ void mm_free(void *bp) {
 }
 
 static void *find_fit(size_t asize) {
-  if (free_listp == NULL)
-    return NULL;
+  for (int class = GET_CLASS_BY_SIZE(asize); class <= N_LISTS; class++) {
+    if (!IS_FREE_LIST_INITIALIZED(class))
+      continue;
 
-  for (void *bp = free_listp;; bp = GET_SUCC(bp)) {
-    if (GET_SIZE(HDRP(bp)) >= asize)
-      return bp;
+    char *free_listp = GET_FREE_LIST_HEAD(class);
 
-    if (IS_FREE_LIST_TAIL(bp))
-      break;
+    for (void *bp = free_listp;; bp = GET_SUCC(bp)) {
+      if (GET_SIZE(HDRP(bp)) >= asize)
+        return bp;
+
+      if (IS_FREE_LIST_TAIL(bp))
+        break;
+    }
   }
-
-  /*
-  for (void *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    if (!GET_ALLOC(HDRP(bp)) && GET_SIZE(HDRP(bp)) >= asize)
-      return bp;
-  }
-  */
 
   return NULL;
 }
