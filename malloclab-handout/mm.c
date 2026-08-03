@@ -97,7 +97,7 @@ int msb_index(unsigned x) {
   c = c + (c >> 16);
   return (int)(c & 0x3f) - 1;
 }
-#define N_LISTS 10
+#define N_LISTS 16
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define GET_CLASS_BY_SIZE(size) (MIN(msb_index(size), N_LISTS - 1))
 #define IS_FREE_LIST_INITIALIZED(n)                                            \
@@ -272,14 +272,46 @@ static void insert_into_free_list(char *bp) {
     // this is the first free block
     CLEAR_PRED(bp);
     CLEAR_SUCC(bp);
-  } else {
-    char *free_listp = GET_FREE_LIST_HEAD(class);
-    // there are some free blocks already
+    PUT_FREE_LIST_HEAD(bp, class);
+    return;
+  }
+
+  char *free_listp = GET_FREE_LIST_HEAD(class);
+
+  void *block_with_lesser_addr = NULL;
+  for (void *bp2 = free_listp;; bp2 = GET_SUCC(bp2)) {
+    if ((unsigned long)bp2 > (unsigned long)bp) {
+      if (IS_FREE_LIST_HEAD(bp2))
+        break;
+
+      block_with_lesser_addr = GET_PRED(bp2);
+      break;
+    }
+    if (IS_FREE_LIST_TAIL(bp2)) {
+      block_with_lesser_addr = bp2;
+      break;
+    }
+  }
+
+  if (block_with_lesser_addr == NULL) {
+    // new block goes to head
     PUT_PRED(free_listp, bp);
     CLEAR_PRED(bp);
     PUT_SUCC(bp, free_listp);
+    PUT_FREE_LIST_HEAD(bp, class);
+  } else if (IS_FREE_LIST_TAIL(block_with_lesser_addr)) {
+    // new block goes to tail
+    PUT_SUCC((char *)block_with_lesser_addr, bp);
+    PUT_PRED(bp, block_with_lesser_addr);
+    CLEAR_SUCC(bp);
+  } else {
+    // new block goes to the middle
+    char *succ = GET_SUCC(block_with_lesser_addr);
+    PUT_PRED(succ, bp);
+    PUT_SUCC((char *)block_with_lesser_addr, bp);
+    PUT_SUCC(bp, succ);
+    PUT_PRED(bp, block_with_lesser_addr);
   }
-  PUT_FREE_LIST_HEAD(bp, class);
 }
 
 static void dump_free_list(char *msg, char *free_listp) {
