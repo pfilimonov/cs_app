@@ -169,12 +169,17 @@ int check_free_list(char *free_listp) {
       continue;
 
     int found_in_free_list = 0;
-    for (char *fbp = free_listp;; fbp = GET_SUCC(fbp)) {
-      if (fbp == bp) {
-        found_in_free_list = 1;
-        break;
+    for (int off = 1; off <= N_LISTS; off++) {
+      char *flistp = GET_FREE_LIST_HEAD(off);
+      for (char *fbp = flistp;; fbp = GET_SUCC(fbp)) {
+        if (fbp == bp) {
+          found_in_free_list = 1;
+          break;
+        }
+        if (IS_FREE_LIST_TAIL(fbp))
+          break;
       }
-      if (IS_FREE_LIST_TAIL(fbp))
+      if (found_in_free_list)
         break;
     }
 
@@ -237,11 +242,16 @@ static void delete_from_free_list(char *bp) {
   // printf("Deleting %p from free list\n", bp);
   // dump_free_list("DELETE");
 
+  if (GET_ALLOC(HDRP(bp))) {
+    printf("[ERROR] Attempting to delete non-free block %p\n", bp);
+    exit(1);
+  }
+
   int size = GET_SIZE(HDRP(bp));
   int class = GET_CLASS_BY_SIZE(size);
 
   if (!IS_FREE_LIST_INITIALIZED(class)) {
-    printf("[ERROR] Deleting from empty free list %d\n", class);
+    printf("[ERROR] Deleting from empty free list %d. Size=%d\n", class, size);
     exit(1);
   }
 
@@ -262,14 +272,17 @@ static void delete_from_free_list(char *bp) {
 }
 
 static void insert_into_free_list(char *bp) {
-  // printf("Inserting %p into free list\n", bp);
   // dump_free_list("INSERT");
 
   int size = GET_SIZE(HDRP(bp));
   int class = GET_CLASS_BY_SIZE(size);
 
+  // printf("Inserting %p into free list. Size=%d, class=%d\n", bp, size,
+  // class);
+
   if (!IS_FREE_LIST_INITIALIZED(class)) {
     // this is the first free block
+    // printf("Free list not initialized. Class=%d\n", class);
     CLEAR_PRED(bp);
     CLEAR_SUCC(bp);
     PUT_FREE_LIST_HEAD(bp, class);
@@ -523,11 +536,10 @@ void *mm_malloc(size_t size) {
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_realloc(void *ptr, size_t size) {
+void *mm_realloc_(void *ptr, size_t size) {
   void *oldptr = ptr;
   void *newptr;
   size_t copySize;
-
   newptr = mm_malloc(size);
   if (newptr == NULL)
     return NULL;
@@ -536,8 +548,87 @@ void *mm_realloc(void *ptr, size_t size) {
     copySize = size;
   memcpy(newptr, oldptr, copySize);
   mm_free(oldptr);
+  return newptr;
+}
+
+void *mm_realloc(void *ptr, size_t size) {
+  void *oldptr = ptr;
+  size_t old_size = GET_SIZE(HDRP(oldptr));
+  size_t old_payload_size = PAYLOAD_SIZE(oldptr);
+
+  if (ptr == NULL)
+    return mm_malloc(size);
+
+  if (size == 0) {
+    mm_free(ptr);
+    return NULL;
+  }
+
+  if (size <= old_payload_size) {
+    size_t asize;
+    if (size <= DSIZE)
+      asize = 2 * DSIZE;
+    else
+      asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+
+    size_t csize = old_size;
+    if (csize - asize >= DSIZE * 2) {
+      size_t asize1 = asize;
+      size_t asize2 = csize - asize;
+      PUT(HDRP(oldptr), PACK(asize1, 1));
+      PUT(FTRP(oldptr), PACK(asize1, 1));
+      PUT(HDRP(NEXT_BLKP(oldptr)), PACK(asize2, 0));
+      PUT(FTRP(NEXT_BLKP(oldptr)), PACK(asize2, 0));
+      insert_into_free_list(NEXT_BLKP(oldptr));
+    }
+
+    return oldptr;
+  }
+
+  // new size is bigger than the old one
+  char *next_blk = NEXT_BLKP(oldptr);
+  size_t next_size = GET_SIZE(HDRP(next_blk));
+
+  // next free block is allocated or too small - do full realloc
+  if (GET_ALLOC(HDRP(next_blk)) || size - old_size + 2 * WSIZE > next_size) {
+    void *newptr;
+    size_t copySize;
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
+      return NULL;
+    copySize = GET_SIZE(HDRP(oldptr)) - DSIZE;
+    if (size < copySize)
+      copySize = size;
+    memcpy(newptr, oldptr, copySize);
+    mm_free(oldptr);
+    return newptr;
+  }
+
+  // "allocate" next free block
+
+  delete_from_free_list(next_blk);
+
+  size_t asize;
+  if (size <= DSIZE)
+    asize = 2 * DSIZE;
+  else
+    asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+
+  size_t csize = old_size + next_size;
+  if (csize - asize >= DSIZE * 2) {
+    size_t asize1 = asize;
+    size_t asize2 = csize - asize;
+    PUT(HDRP(oldptr), PACK(asize1, 1));
+    PUT(FTRP(oldptr), PACK(asize1, 1));
+    PUT(HDRP(NEXT_BLKP(oldptr)), PACK(asize2, 0));
+    PUT(FTRP(NEXT_BLKP(oldptr)), PACK(asize2, 0));
+    insert_into_free_list(NEXT_BLKP(oldptr));
+  } else {
+    PUT(HDRP(oldptr), PACK(csize, 1));
+    PUT(FTRP(oldptr), PACK(csize, 1));
+  }
 
   // check_heap();
 
-  return newptr;
+  return oldptr;
 }
