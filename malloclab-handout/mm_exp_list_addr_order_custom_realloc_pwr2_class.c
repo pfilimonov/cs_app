@@ -1,3 +1,4 @@
+
 /*
  * mm-naive.c - The fastest, least memory-efficient malloc package.
  *
@@ -464,21 +465,13 @@ static void *find_fit(size_t asize) {
 
     char *free_listp = GET_FREE_LIST_HEAD(class);
 
-    size_t cur_best_size = 0;
-    char *cur_fit = NULL;
     for (void *bp = free_listp;; bp = GET_SUCC(bp)) {
-      size_t sz = GET_SIZE(HDRP(bp));
-      if (sz >= asize && (!cur_best_size || sz < cur_best_size)) {
-        cur_best_size = sz;
-        cur_fit = bp;
-      }
+      if (GET_SIZE(HDRP(bp)) >= asize)
+        return bp;
 
       if (IS_FREE_LIST_TAIL(bp))
         break;
     }
-
-    if (cur_fit)
-      return cur_fit;
   }
 
   return NULL;
