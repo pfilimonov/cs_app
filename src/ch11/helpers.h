@@ -12,6 +12,8 @@
 #include <netdb.h>
 
 #define LISTENQ 1024
+#define MAXLINE 1024
+#define MAXBUF 1024
 
 int open_listenfd(char *port);
 int Open_listenfd(char *port);

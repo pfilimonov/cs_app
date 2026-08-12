@@ -20,9 +20,6 @@
 #include "helpers.h"
 #include "rio.h"
 
-#define MAXLINE 1024
-#define MAXBUF 1024
-
 extern char **environ;
 typedef struct sockaddr SA;
 
@@ -58,6 +55,9 @@ int main(int argc, char **argv) {
     clientlen = sizeof(clientaddr);
     connfd = accept(listenfd, (SA *)(&clientaddr), &clientlen);
     if (connfd < 0) {
+      if (errno == EINTR)
+        continue;
+
       fprintf(stderr, "failed to accept connection %s\n", strerror(errno));
       exit(1);
     }
