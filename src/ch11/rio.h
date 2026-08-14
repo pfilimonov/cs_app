@@ -14,6 +14,7 @@ typedef struct {
 // Unbuffered I/O
 ssize_t rio_readn(int fd, void *usrbuf, size_t n);
 ssize_t rio_writen(int fd, void *usrbuf, size_t n);
+ssize_t Rio_writen(int fd, void *usrbuf, size_t n);
 
 // Buffered I/O
 void rio_readinitb(rio_t *rp, int fd);

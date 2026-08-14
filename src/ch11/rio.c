@@ -1,5 +1,7 @@
 #include "rio.h"
+#include <asm-generic/errno-base.h>
 #include <memory.h>
+#include <stdlib.h>
 
 void rio_readinitb(rio_t *rp, int fd) {
   rp->rio_fd = fd;
@@ -111,4 +113,17 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n) {
   }
 
   return n;
+}
+
+ssize_t Rio_writen(int fd, void *usrbuf, size_t n) {
+  ssize_t res = rio_writen(fd, usrbuf, n);
+  if (res < 0) {
+    if (errno == EPIPE) {
+      fprintf(stderr, "Client closed connection\n");
+      return -1;
+    }
+    fprintf(stderr, "Socket error");
+    exit(1);
+  }
+  return res;
 }
