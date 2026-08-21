@@ -1,3 +1,6 @@
+#ifndef WRAP
+#define WRAP
+
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdio.h>
@@ -48,3 +51,4 @@ void V(sem_t *s) {
     exit(1);
   }
 }
+#endif

@@ -1,0 +1,5 @@
+build:
+  rm -rf build && cmake -S . -B build && cmake --build build
+
+run *args:
+  build/solution {{args}}
