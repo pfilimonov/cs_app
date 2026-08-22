@@ -1,13 +1,29 @@
 #include "helpers.h"
 #include "rio.h"
 #include "wrap.h"
+#include <signal.h>
 #include <sys/select.h>
 #include <unistd.h>
 
 int echo(int connfd, rio_t *rio);
 void command(void);
 
+int running = 1;
+sem_t mutex;
+
+void sigint_handler(int _);
+
+void sigint_handler(int _) {
+  P(&mutex);
+  running = 0;
+  V(&mutex);
+}
+
 int main(int argc, char **argv) {
+  if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+    app_error("Failed to install sigint_handler\n");
+  }
+
   int listenfd, connfd;
   int maxfd;
   rio_t *rios;
@@ -28,6 +44,11 @@ int main(int argc, char **argv) {
   FD_SET(listenfd, &read_set);     /* Add listenfd to read set */
 
   while (1) {
+    P(&mutex);
+    if (!running)
+      break;
+    V(&mutex);
+
     ready_set = read_set;
     Select(maxfd + 1, &ready_set, NULL, NULL, NULL);
     if (FD_ISSET(STDIN_FILENO, &ready_set))
@@ -61,6 +82,8 @@ int main(int argc, char **argv) {
       FD_CLR(fd, &read_set);
     }
   }
+
+  free(rios);
 }
 
 void command(void) {
