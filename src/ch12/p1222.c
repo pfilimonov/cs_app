@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
     exit(0);
   }
+
   listenfd = Open_listenfd(argv[1]);
   maxfd = listenfd;
   rios = malloc(maxfd * sizeof(rio_t));
