@@ -11,12 +11,15 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <netdb.h>
 
 extern char **environ;
 typedef struct sockaddr SA;
+
+uint64_t rdtsc(void);
 
 #define LISTENQ 1024
 #define MAXLINE 1024

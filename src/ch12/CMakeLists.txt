@@ -8,7 +8,7 @@ add_executable(solution)
 
 target_sources(solution
   PRIVATE
-  p1226.c
+  p1234.c
   pool.c
   rio.c
   helpers.c
