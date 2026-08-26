@@ -65,7 +65,7 @@ int open_listenfd(char *port) {
 int Open_listenfd(char *port) {
   int fd = open_listenfd(port);
   if (fd < 0) {
-    fprintf(stderr, "open_listenfd");
+    fprintf(stderr, "failed open_listenfd\n");
     exit(1);
   }
 
