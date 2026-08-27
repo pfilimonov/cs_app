@@ -13,6 +13,7 @@ target_sources(testrunner
   ../parse.c
   ../tpool.c
   ../sbuf.c
+  ../cache.c
 
   PRIVATE
     FILE_SET HEADERS
@@ -23,4 +24,5 @@ target_sources(testrunner
       ../parse.h
       ../tpool.h
       ../sbuf.h
+      ../cache.h
 )

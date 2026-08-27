@@ -2,10 +2,10 @@ test:
   cd test && rm -rf build && cmake -S . -B build && cmake --build build && build/testrunner
 
 build:
-  gcc proxy.c csapp.c parse.c tpool.c sbuf.c -o proxy
+  gcc proxy.c csapp.c parse.c tpool.c sbuf.c cache.c -o proxy
 
 run *args:
   ./proxy {{args}}
 
 rerun:
-  gcc proxy.c csapp.c parse.c tpool.c sbuf.c -o proxy && ./proxy 5000
+  gcc proxy.c csapp.c parse.c tpool.c sbuf.c cache.c -o proxy && ./proxy 5000

@@ -8,9 +8,6 @@ void doit(int fd);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
-/* Recommended max cache and object sizes */
-#define MAX_CACHE_SIZE 1049000
-#define MAX_OBJECT_SIZE 102400
 #define SBUFSIZE 16
 #define N_THREADS 4
 
@@ -40,8 +37,19 @@ void *conn_thread(void *vargp) {
   return NULL;
 }
 
+thread_pool_t tpool;
+
+void sigint_handler(int _);
+
+void sigint_handler(int _) {
+  close_thread_pool(&tpool);
+  exit(0);
+}
+
 int main(int argc, char *argv[]) {
   signal(SIGPIPE, SIG_IGN);
+  if (signal(SIGINT, sigint_handler) == SIG_ERR)
+    app_error("Failed to set SIGINT handler");
 
   int listenfd, client_connfd;
   char hostname[MAXLINE], port[MAXLINE];
@@ -56,7 +64,6 @@ int main(int argc, char *argv[]) {
 
   sbuf_t sbuf;
   sbuf_init(&sbuf, SBUFSIZE);
-  thread_pool_t tpool;
 
   init_thread_pool(&tpool, N_THREADS, conn_thread, &sbuf);
 
