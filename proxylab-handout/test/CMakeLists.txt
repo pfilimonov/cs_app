@@ -11,6 +11,8 @@ target_sources(testrunner
   tests.c
   ../csapp.c
   ../parse.c
+  ../tpool.c
+  ../sbuf.c
 
   PRIVATE
     FILE_SET HEADERS
@@ -19,4 +21,6 @@ target_sources(testrunner
     FILES
       ../csapp.h
       ../parse.h
+      ../tpool.h
+      ../sbuf.h
 )

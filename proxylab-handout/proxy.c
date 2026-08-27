@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "parse.h"
+#include "tpool.h"
 
 void doit(int fd);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
@@ -10,6 +11,34 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
+#define SBUFSIZE 16
+#define N_THREADS 4
+
+void examine_thread_pool(thread_pool_t *tp);
+
+void examine_thread_pool(thread_pool_t *tp) {
+  if (exhausted(tp))
+    expand_thread_pool(tp);
+  else if (chilling(tp))
+    shrink_thread_pool(tp);
+}
+
+void *conn_thread(void *vargp);
+
+void *conn_thread(void *vargp) {
+  thread_pool_t *tp = (thread_pool_t *)vargp;
+  sbuf_t *sbuf = tp->sbuf;
+
+  while (1) {
+    int connfd = sbuf_remove(sbuf);
+    notify_busy(tp);
+    doit(connfd);
+    Close(connfd);
+    notify_free(tp);
+  }
+
+  return NULL;
+}
 
 int main(int argc, char *argv[]) {
   signal(SIGPIPE, SIG_IGN);
@@ -25,6 +54,12 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  sbuf_t sbuf;
+  sbuf_init(&sbuf, SBUFSIZE);
+  thread_pool_t tpool;
+
+  init_thread_pool(&tpool, N_THREADS, conn_thread, &sbuf);
+
   listenfd = Open_listenfd(argv[1]);
   while (1) {
     clientlen = sizeof(clientaddr);
@@ -36,8 +71,8 @@ int main(int argc, char *argv[]) {
                 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
 
-    doit(client_connfd);
-    Close(client_connfd);
+    examine_thread_pool(&tpool);
+    sbuf_insert(&sbuf, client_connfd);
   }
 }
 
