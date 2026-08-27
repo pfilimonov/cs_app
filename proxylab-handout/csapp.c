@@ -679,8 +679,9 @@ ssize_t rio_readn(int fd, void *usrbuf, size_t n) {
 
   while (nleft > 0) {
     if ((nread = read(fd, bufp, nleft)) < 0) {
-      if (errno == EINTR) /* Interrupted by sig handler return */
-        nread = 0;        /* and call read() again */
+      if (errno == EINTR || errno == ECONNRESET ||
+          errno == ECONNABORTED) /* Interrupted by sig handler return */
+        nread = 0;               /* and call read() again */
       else
         return -1; /* errno set by read() */
     } else if (nread == 0)
@@ -731,7 +732,7 @@ static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n) {
   while (rp->rio_cnt <= 0) { /* Refill if buf is empty */
     rp->rio_cnt = read(rp->rio_fd, rp->rio_buf, sizeof(rp->rio_buf));
     if (rp->rio_cnt < 0) {
-      if (errno == ECONNABORTED)
+      if (errno == ECONNABORTED || errno == ECONNRESET)
         return 0;
       if (errno != EINTR) /* Interrupted by sig handler return */
         return -1;
@@ -826,7 +827,7 @@ ssize_t Rio_readn(int fd, void *ptr, size_t nbytes) {
 
 void Rio_writen(int fd, void *usrbuf, size_t n) {
   if (rio_writen(fd, usrbuf, n) != n) {
-    if (errno == ECONNRESET)
+    if (errno == ECONNRESET || errno == ECONNABORTED)
       return 0;
     else
       unix_error("Rio_writen error");
