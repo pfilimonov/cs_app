@@ -1,6 +1,7 @@
 #include "csapp.h"
 #include <stdio.h>
 
+#include "cache.h"
 #include "parse.h"
 #include "tpool.h"
 
@@ -37,12 +38,14 @@ void *conn_thread(void *vargp) {
   return NULL;
 }
 
-thread_pool_t tpool;
+static thread_pool_t tpool;
+static cache_t cache;
 
 void sigint_handler(int _);
 
 void sigint_handler(int _) {
   close_thread_pool(&tpool);
+  free_cache(&cache);
   exit(0);
 }
 
@@ -64,8 +67,8 @@ int main(int argc, char *argv[]) {
 
   sbuf_t sbuf;
   sbuf_init(&sbuf, SBUFSIZE);
-
   init_thread_pool(&tpool, N_THREADS, conn_thread, &sbuf);
+  init_cache(&cache);
 
   listenfd = Open_listenfd(argv[1]);
   while (1) {
@@ -101,8 +104,20 @@ void doit(int fd) {
                 "Invalid request line");
   }
 
+  char key[MAXLINE];
+  strcpy(key, buf);
+
   printf("Request line received: %s %s %s\nHost: %s:%s\n", req_line.method,
          req_line.uri, req_line.version, req_line.host, req_line.port);
+
+  char *cache_data = NULL;
+  size_t cache_data_size = read_cache_entry(&cache, key, &cache_data);
+
+  if (cache_data_size > 0 && cache_data != NULL) {
+    Rio_writen(fd, cache_data, cache_data_size);
+    free(cache_data);
+    return;
+  }
 
   dest_fd = Open_clientfd(req_line.host, req_line.port);
 
@@ -111,8 +126,11 @@ void doit(int fd) {
   handle_request_headers(&rio_in, &req_line, dest_fd);
 
   Rio_readinitb(&rio_out, dest_fd);
-  handle_response(&rio_out, fd);
+  handle_response(&rio_out, &cache_data, &cache_data_size);
 
+  Rio_writen(fd, cache_data, cache_data_size);
+  write_cache_entry(&cache, key, cache_data, cache_data_size);
+  free(cache_data);
   Close(dest_fd);
 }
 

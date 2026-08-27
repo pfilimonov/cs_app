@@ -25,8 +25,11 @@ sbuf.o: sbuf.c sbuf.h
 proxy.o: proxy.c csapp.h parse.h
 	$(CC) $(CFLAGS) -c proxy.c
 
-proxy: proxy.o parse.o csapp.o sbuf.o tpool.o
-	$(CC) $(CFLAGS) proxy.o parse.o csapp.o sbuf.o tpool.o -o proxy $(LDFLAGS)
+cache.o: cache.c cache.h
+	$(CC) $(CFLAGS) -c cache.c
+
+proxy: proxy.o parse.o csapp.o sbuf.o tpool.o cache.o
+	$(CC) $(CFLAGS) proxy.o parse.o csapp.o sbuf.o tpool.o cache.o -o proxy $(LDFLAGS)
 
 # Creates a tarball in ../proxylab-handin.tar that you can then
 # hand in. DO NOT MODIFY THIS!

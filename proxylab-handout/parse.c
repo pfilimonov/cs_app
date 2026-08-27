@@ -121,14 +121,29 @@ void handle_request_headers(rio_t *rp_in, struct req_line_parsed *req_line,
   Rio_writen(out_fd, "\r\n", 2);
 }
 
-void handle_response(rio_t *rio_in, int out_fd) {
+void handle_response(rio_t *rio_in, char **data, size_t *data_size) {
   char buf[MAXLINE];
   int cl = 0;
 
+  *data = NULL;
+  *data_size = 0;
+
   while (1) {
     Rio_readlineb(rio_in, buf, MAXLINE);
-    printf("Send response string from server: %s", buf);
-    Rio_writen(out_fd, buf, strlen(buf));
+    // printf("Send response string from server: %s", buf);
+    // Rio_writen(out_fd, buf, strlen(buf));
+
+    size_t size = strlen(buf);
+
+    if (*data == NULL) {
+      *data = malloc(sizeof(char) * size);
+      memcpy(*data, buf, size);
+      *data_size += size;
+    } else {
+      *data = realloc(*data, *data_size + size);
+      memcpy(*data + *data_size, buf, size);
+      *data_size += size;
+    }
 
     if (strncasecmp(buf, "Content-Length: ", 16) == 0)
       cl = atoi(buf + 16);
@@ -140,6 +155,16 @@ void handle_response(rio_t *rio_in, int out_fd) {
   if (cl > 0) {
     char body[cl];
     Rio_readnb(rio_in, body, cl);
-    Rio_writen(out_fd, body, cl);
+    // Rio_writen(out_fd, body, cl);
+
+    if (*data == NULL) {
+      *data = malloc(sizeof(char) * cl);
+      memcpy(*data, body, cl);
+      *data_size += cl;
+    } else {
+      *data = realloc(*data, *data_size + cl);
+      memcpy(*data + *data_size, body, cl);
+      *data_size += cl;
+    }
   }
 }
