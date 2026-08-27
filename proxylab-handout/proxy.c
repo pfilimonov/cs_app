@@ -9,8 +9,11 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
+#define MAX_OBJECT_SIZE 102400
 
 int main(int argc, char *argv[]) {
+  signal(SIGPIPE, SIG_IGN);
+
   int listenfd, client_connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
@@ -26,6 +29,9 @@ int main(int argc, char *argv[]) {
   while (1) {
     clientlen = sizeof(clientaddr);
     client_connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+    if (client_connfd < 0)
+      continue;
+
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
                 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);

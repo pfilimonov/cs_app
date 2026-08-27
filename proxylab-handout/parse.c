@@ -1,8 +1,6 @@
 #include "parse.h"
 #include "csapp.h"
 
-#define MAX_OBJECT_SIZE 102400
-
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
@@ -140,8 +138,8 @@ void handle_response(rio_t *rio_in, int out_fd) {
   }
 
   if (cl > 0) {
-    char body[MAX_OBJECT_SIZE];
-    Rio_readnb(rio_in, body, MAX_OBJECT_SIZE);
+    char body[cl];
+    Rio_readnb(rio_in, body, cl);
     Rio_writen(out_fd, body, cl);
   }
 }
